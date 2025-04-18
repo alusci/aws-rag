@@ -12,16 +12,19 @@ def qa_search(query, vectorstore):
     llm = initialize_llm()
     
     # Define the prompt template
-    prompt = PromptTemplate.from_template(
-        """Answer the question based on the following context:
-        
-        Context:
-        {context}
-        
-        Question: {question}
-        
-        Answer:"""
-    )
+    template = """You are a helpful assistant that provides accurate information based on the given context.
+    
+    Context:
+    {context}
+    
+    Question:
+    {question}
+    
+    Answer the question based only on the provided context. If the context doesn't contain the relevant information, 
+    say "I don't have enough information to answer this question." Don't make up information.
+    """
+
+    prompt = PromptTemplate.from_template(template)
     
     # Create the retriever
     retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
