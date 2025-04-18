@@ -2,21 +2,49 @@ import json
 from utils.vector_store import get_vectorstore
 from utils.models import initialize_llm
 from utils.response_formatter import format_response
-from langchain.chains import RetrievalQA
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain.prompts import PromptTemplate
+from langchain.schema.output_parser import StrOutputParser
+from langchain.schema.runnable import RunnablePassthrough
 
 def qa_search(query, vectorstore):
     """Perform QA search with LLM"""
     llm = initialize_llm()
-    qa_chain = RetrievalQA.from_chain_type(
-        llm=llm,
-        chain_type="stuff",
-        retriever=vectorstore.as_retriever(search_kwargs={"k": 3}),
-        return_source_documents=True
+    
+    # Define the prompt template
+    prompt = PromptTemplate.from_template(
+        """Answer the question based on the following context:
+        
+        Context:
+        {context}
+        
+        Question: {question}
+        
+        Answer:"""
     )
-    result = qa_chain({"query": query})
+    
+    # Create the retriever
+    retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
+    
+    # Create document chain
+    document_chain = create_stuff_documents_chain(llm, prompt)
+    
+    # Create retrieval chain
+    retrieval_chain = (
+        {"context": retriever, "question": RunnablePassthrough()}
+        | document_chain
+        | StrOutputParser()
+    )
+    
+    # Execute the chain
+    result = retrieval_chain.invoke(query)
+    
+    # Get source documents for the response
+    source_docs = retriever.get_relevant_documents(query)
+    
     return format_response(
-        answer=result["result"],
-        sources=result["source_documents"]
+        answer=result,
+        sources=source_docs
     )
 
 def main():
@@ -49,4 +77,4 @@ def main():
         print(json.dumps(formatted_response, indent=2))
 
 if __name__ == "__main__":
-    main() 
+    main()
